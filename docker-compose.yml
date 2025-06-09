@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  redis:
+    container_name: ytb_redis
+    image: redis:7
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  ytb-gateway:
+    container_name: ytb_gateway
+    image: ${REGISTRY}/ytb-gateway:${TAG:-latest}
+    build: 
+      context: ../ytb-gateway
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=ytb_redis
+      - REDIS_PORT=6379
+      - ENV=production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  ytb-fastwhisper:
+    container_name: ytb_fastwhisper
+    image: ${REGISTRY}/ytb-fastwhisper:${TAG:-latest}
+    build:
+      context: ../ytb-fastwhisper
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=ytb_redis
+      - REDIS_PORT=6379
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  queue-worker:
+    container_name: ytb_queue_worker
+    image: ${REGISTRY}/queue-worker:${TAG:-latest}
+    build:
+      context: ../queue-worker
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=ytb_redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - ytb-fastwhisper
+    restart: unless-stopped
+
+volumes:
+  redis_data:
